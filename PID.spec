@@ -1,10 +1,10 @@
-# -*- mode: python -*-
+# -*- mode: python ; coding: utf-8 -*-
 
 block_cipher = None
 
 
-a = Analysis(['main_mat_anim.py'],
-             pathex=['D:\\Python\\Signal'],
+a = Analysis(['PIDTeachingAid_GUI.py'],
+             pathex=['.\\'],
              binaries=[],
              datas=[('./image0/Icon.ico', './image0'),
                     ('./image0/hand.png', './image0')],
@@ -14,7 +14,8 @@ a = Analysis(['main_mat_anim.py'],
              excludes=[],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
-             cipher=block_cipher)
+             cipher=block_cipher,
+             noarchive=False)
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 exe = EXE(pyz,
@@ -22,8 +23,12 @@ exe = EXE(pyz,
           a.binaries,
           a.zipfiles,
           a.datas,
+          [],
           name='PID',
           debug=False,
+          bootloader_ignore_signals=False,
           strip=False,
           upx=True,
+          upx_exclude=[],
+          runtime_tmpdir=None,
           console=False, icon='./image0/Icon.ico')
