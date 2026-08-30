@@ -64,6 +64,43 @@ def simulate(kp, ki, kd, *, m=1.0, c=0.5, k=2.0,
     return SimResult(t=t, y=y, u=u_out)
 
 
+def simulate_theory(kp, ki, kd, *, m=1.0, c=0.5, k=2.0,
+                    target=1.0, t_total=16.0, dt=0.02):
+    # Continuous-time closed loop GC/(1+GC): the ideal PID acts on the
+    # true error derivative. The step reference makes the D-term fire
+    # an impulse kd*target*delta(t); its whole effect is the initial
+    # momentum v(0+) = kd*target/m. The ODE is integrated with RK4,
+    # accurate to O(dt^4) - exact at plotting resolution, and robust
+    # where a pole-residue formula would trip on repeated roots.
+    # State: x (position), v (velocity), z (integral of error)
+    def deriv(state):
+        x, v, z = state
+        u = pid_control(target - x, z, -v, kp=kp, ki=ki, kd=kd)
+        return np.array([v, plant_accel(x, v, u, m=m, c=c, k=k),
+                         target - x])
+
+    def force(state):
+        x, v, z = state
+        return pid_control(target - x, z, -v, kp=kp, ki=ki, kd=kd)
+
+    steps = int(t_total / dt) + 1
+    t = np.linspace(0.0, t_total, steps)
+    y = np.zeros(steps)
+    u_out = np.zeros(steps)
+    state = np.array([0.0, kd * target / m, 0.0])
+    y[0] = state[0]
+    u_out[0] = force(state)
+    for i in range(1, steps):
+        k1 = deriv(state)
+        k2 = deriv(state + dt / 2 * k1)
+        k3 = deriv(state + dt / 2 * k2)
+        k4 = deriv(state + dt * k3)
+        state = state + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+        y[i] = state[0]
+        u_out[i] = force(state)
+    return SimResult(t=t, y=y, u=u_out)
+
+
 def analyze(t, y, *, target=1.0, band=0.05):
     # Settling time: walk back from the end to the last sample outside
     # the band; the run converged only when the final sample is inside

@@ -9,7 +9,7 @@ from tkinter import ttk, filedialog
 
 from functions import *
 from boxBase import *
-from simulation import simulate, analyze
+from simulation import simulate, simulate_theory, analyze
 from plotPanel import PlotPanel
 from animPanel import AnimPanel
 
@@ -55,7 +55,7 @@ class PIDTeachingAid(tk.Tk):
         y = (hs / 2) - (h / 2)
         self.geometry(f'{w}x{h}+{int(x)}+{int(y)}')
         self.resizable(width=False, height=False)
-        self.bind('<Control-Key-F2>', self.ToggleWatermark)
+        self.bind('<Control-Key-F2>', self.ToggleTestMode)
         # ttk styles
         style = ttk.Style()
         try:
@@ -79,7 +79,9 @@ class PIDTeachingAid(tk.Tk):
         # Settings
         self.settingfile = Path(tempfile.gettempdir()) / 'PIDTeachingAid.txt'
         self.data = self.LoadSetting()
-        self.show_watermark = bool(self.data.watermark)
+        # Test mode (Ctrl+F2): theory overlay on the charts and no
+        # watermark in exports. Stored inverted as the watermark flag
+        self.test_mode = not bool(self.data.watermark)
 
         ########################################################################
         ####################### GUI objects : Control Panel ####################
@@ -147,7 +149,8 @@ class PIDTeachingAid(tk.Tk):
         ToolTip(self.PauseButton,  'Pause the animation')
         ToolTip(self.StopButton,   'Stop and rewind the animation')
         ToolTip(self.ExportButton, 'Export the animation as a GIF\n'
-                                   '(Ctrl+F2 toggles the watermark)')
+                                   '(Ctrl+F2: test mode - theory\n'
+                                   ' overlay, no watermark)')
         # Spring-mass animation figure
         self.anim = AnimPanel(self.controlframe)
 
@@ -224,7 +227,13 @@ class PIDTeachingAid(tk.Tk):
         self.res = simulate(kp, ki, kd, m=self.m, c=self.c, k=self.k,
                             t_total=self.t_total, dt=self.dt)
         self.met = analyze(self.res.t, self.res.y)
-        self.plot.UpdatePlot(self.res, self.met)
+        # Test mode overlays the continuous-time closed-loop theory
+        theory = None
+        if self.test_mode:
+            theory = simulate_theory(kp, ki, kd, m=self.m, c=self.c,
+                                     k=self.k, t_total=self.t_total,
+                                     dt=self.dt)
+        self.plot.UpdatePlot(self.res, self.met, theory=theory)
         self.anim.SetParamText(self.m, self.c, self.k, kp, ki, kd)
 
     ############################################################################
@@ -277,8 +286,9 @@ class PIDTeachingAid(tk.Tk):
             self.anim_running = False
             self.AnimState(0)
 
-    def ToggleWatermark(self, event=None):
-        self.show_watermark = not self.show_watermark
+    def ToggleTestMode(self, event=None):
+        self.test_mode = not self.test_mode
+        self.UpdatePlot()
 
     def ExportFrameHook(self, pos, curr_t, curr_u):
         # Called between exported frames: keep the chart cursor moving
@@ -301,7 +311,7 @@ class PIDTeachingAid(tk.Tk):
         try:
             self.anim.ExportGIF(file_path, self.res,
                                 sample_rate=self.sample_rate,
-                                show_watermark=self.show_watermark,
+                                show_watermark=not self.test_mode,
                                 frame_hook=self.ExportFrameHook)
         finally:
             self.StopAnimation()
@@ -316,7 +326,7 @@ class PIDTeachingAid(tk.Tk):
         self.data.kp = self.KpSlider.get()
         self.data.ki = self.KiSlider.get()
         self.data.kd = self.KdSlider.get()
-        self.data.watermark = int(self.show_watermark)
+        self.data.watermark = int(not self.test_mode)
 
     def LoadSetting(self):
         # Missing file or bad lines fall back to the defaults

@@ -25,7 +25,7 @@ class PlotPanel:
         self.cursor_dot2  = None
         self.cursor_line2 = None
 
-    def UpdatePlot(self, res, met, target=1.0):
+    def UpdatePlot(self, res, met, target=1.0, theory=None):
         t, y, u = res.t, res.y, res.u
         t_end = t[-1]
         # The charts only format what analyze() found
@@ -40,6 +40,11 @@ class PlotPanel:
         # Chart 1: position response
         self.ax1.clear()
         self.ax1.plot(t, y, color='red', lw=2)
+        # Test mode: continuous-time theory overlay in green
+        if theory is not None:
+            self.ax1.plot(theory.t, theory.y, color='#008000',
+                          ls='--', lw=1.5, label='GC/(1+GC) theory')
+            self.ax1.legend(loc='upper right', fontsize=8)
         self.ax1.axhline(target, color='black', ls='--', alpha=0.3)
         self.cursor_dot1, = self.ax1.plot([], [], 'ro', markersize=6)
         self.cursor_line1 = self.ax1.axvline(x=0, color='black',
@@ -98,6 +103,10 @@ class PlotPanel:
         # Chart 2: control force
         self.ax2.clear()
         self.ax2.plot(t, u, color='blue', lw=1.5)
+        if theory is not None:
+            self.ax2.plot(theory.t, theory.u, color='#008000',
+                          ls='--', lw=1.5, label='C/(1+GC) theory')
+            self.ax2.legend(loc='upper right', fontsize=8)
         self.cursor_dot2, = self.ax2.plot([], [], 'bo', markersize=6)
         self.cursor_line2 = self.ax2.axvline(x=0, color='black',
                                              lw=1.5, alpha=0.8)

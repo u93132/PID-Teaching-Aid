@@ -8,7 +8,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from simulation import simulate, analyze, pid_control, plant_accel
+from simulation import (simulate, simulate_theory, analyze,
+                        pid_control, plant_accel)
 
 
 class TestControlLaw(unittest.TestCase):
@@ -70,6 +71,57 @@ class TestSimulate(unittest.TestCase):
         # the first output is kp*1 + ki*1*dt
         res = simulate(20.0, 0.0, 5.0, dt=0.02)
         self.assertAlmostEqual(res.u[0], 20.0, delta=1e-9)
+
+
+class TestTheory(unittest.TestCase):
+    # simulate_theory() is the continuous-time closed loop GC/(1+GC);
+    # every check below compares against linear-system theory
+
+    def test_p_only_matches_closed_form(self):
+        # P control on the plant is a plain damped oscillator
+        #   m*x'' + c*x' + (k+kp)*x = kp
+        # whose step response has an exact closed form
+        m, c, k, kp = 1.0, 0.5, 2.0, 20.0
+        res = simulate_theory(kp, 0.0, 0.0, m=m, c=c, k=k)
+        gain  = kp / (k + kp)
+        sigma = c / (2 * m)
+        omega = np.sqrt((k + kp) / m - sigma ** 2)
+        exact = gain * (1 - np.exp(-sigma * res.t)
+                        * (np.cos(omega * res.t)
+                           + sigma / omega * np.sin(omega * res.t)))
+        self.assertLess(np.max(np.abs(res.y - exact)), 1e-4)
+
+    def test_p_only_final_value(self):
+        # Final value theorem: T(0) = kp / (k + kp)
+        res = simulate_theory(20.0, 0.0, 0.0, k=2.0)
+        self.assertAlmostEqual(res.y[-1], 20.0 / 22.0, delta=0.03)
+
+    def test_integral_final_values(self):
+        # With ki > 0, T(0) = 1; the force then balances the spring
+        res = simulate_theory(20.0, 10.0, 10.0, k=2.0)
+        self.assertAlmostEqual(res.y[-1], 1.0, delta=0.01)
+        self.assertAlmostEqual(res.u[-1], 2.0, delta=0.05)
+
+    def test_derivative_kick(self):
+        # The ideal D-term differentiates the reference step: the
+        # impulse leaves v(0+) = kd/m, so u(0+) = kp - kd*(kd/m)
+        kp, kd, m = 20.0, 10.0, 1.0
+        res = simulate_theory(kp, 0.0, kd, m=m)
+        self.assertAlmostEqual(res.u[0], kp - kd ** 2 / m, places=9)
+        # ...and the position rises immediately (v0*dt scale),
+        # unlike the discrete simulation whose difference quotient
+        # sees no kick at step 0
+        self.assertAlmostEqual(res.y[1], kd / m * 0.02, delta=0.05)
+        euler = simulate(kp, 0.0, kd, m=m)
+        self.assertLess(euler.y[1], res.y[1] / 2)
+
+    def test_grid_matches_simulate(self):
+        # Theory and simulation share the same time axis, so the
+        # charts can overlay them directly
+        res = simulate(20.0, 0.0, 0.0)
+        thr = simulate_theory(20.0, 0.0, 0.0)
+        self.assertEqual(len(thr.t), len(res.t))
+        self.assertTrue(np.array_equal(thr.t, res.t))
 
 
 class TestAnalyze(unittest.TestCase):
