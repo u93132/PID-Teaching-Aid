@@ -49,8 +49,8 @@ class PIDTeachingAid(tk.Tk):
         ws = self.winfo_screenwidth()
         hs = self.winfo_screenheight()
         # Dimension of the GUI
-        w = 1280
-        h = 720
+        w = 960
+        h = 640
         x = (ws / 2) - (w / 2)
         y = (hs / 2) - (h / 2)
         self.geometry(f'{w}x{h}+{int(x)}+{int(y)}')
@@ -58,11 +58,15 @@ class PIDTeachingAid(tk.Tk):
         self.bind('<Control-Key-F2>', self.ToggleTestMode)
         # ttk styles
         style = ttk.Style()
-        try:
-            style.theme_use('clam')
-        except tk.TclError:
-            pass
-        style.configure('Small.TButton', padding=0, width=2)
+        style.theme_create('MyStyle', parent='alt', settings={
+            'TNotebook':     {'configure': {'tabmargins': [2, 2, 2, 0]}},
+            'TNotebook.Tab': {'configure': {'padding':    [5, 0]}},
+            'TCombobox':     {'configure': {'padding': 2, 'arrowsize': 15}},
+            'TFrame':        {'configure': {'background': 'SystemButtonFace'}},
+            'TLabel':        {'configure': {'background': 'SystemButtonFace',
+                                            'foreground': 'SystemButtonText'}},
+        })
+        style.theme_use('MyStyle')
         # Plant parameters
         self.m, self.c, self.k = 1.0, 0.5, 2.0
         # Simulation setup
@@ -89,30 +93,38 @@ class PIDTeachingAid(tk.Tk):
 
         self.controlframe = ttk.Frame(self, padding='5')
         self.controlframe.pack(side='left', fill='y')
-        # Plant parameters display
-        ttk.Label(self.controlframe, text='Plant Parameters',
-                  font=('Arial', 14, 'bold')).pack(pady=5)
-        sys_text = (f'Mass (m): {self.m:.2f}\n'
-                    f'Damping (c): {self.c:.2f}\n'
-                    f'Stiffness (k): {self.k:.2f}')
-        self.SysLabel = ttk.Label(self.controlframe, text=sys_text,
+        # Notebook: Plant | PID
+        self.nb = ttk.Notebook(self.controlframe)
+        self.nb.pack(fill='x', pady=5)
+        self.nb.framename = ['Plant', 'PID']
+        self.nb.frame = [None] * len(self.nb.framename)
+        for i, name in enumerate(self.nb.framename):
+            self.nb.frame[i] = tk.Frame(self.nb)
+            self.nb.frame[i].config(height=320, width=260)
+            self.nb.frame[i].pack()
+            self.nb.add(self.nb.frame[i], text=name)
+        plant_frame = tk.Frame(self.nb.frame[0], padx=8, pady=5)
+        plant_frame.pack(fill='x', anchor='nw')
+        pid_frame   = tk.Frame(self.nb.frame[1], padx=8, pady=5)
+        pid_frame.pack(fill='x', anchor='nw')
+        # Plant tab: m / c / k static display
+        sys_text = (f'{"Mass (m):":<15}{self.m:.2f}\n'
+                    f'{"Damping (c):":<15}{self.c:.2f}\n'
+                    f'{"Stiffness (k):":<15}{self.k:.2f}')
+        self.SysLabel = ttk.Label(plant_frame, text=sys_text,
                                   font=('Courier', 11))
         self.SysLabel.pack(pady=5)
-        ttk.Separator(self.controlframe, orient='horizontal')\
-           .pack(fill='x', pady=15)
-        # PID parameters display and sliders
-        ttk.Label(self.controlframe, text='PID Parameters',
-                  font=('Arial', 14, 'bold')).pack(pady=5)
-        self.InfoLabel = ttk.Label(self.controlframe, text='',
+        # PID tab: gain readout, sliders, tuning guide
+        self.InfoLabel = ttk.Label(pid_frame, text='',
                                    font=('Courier', 11))
-        self.InfoLabel.pack(pady=10)
-        self.KpSlider = SliderBox(self.controlframe, 'Kp (Proportional)',
+        self.InfoLabel.pack(pady=5)
+        self.KpSlider = SliderBox(pid_frame, 'Kp (Proportional)',
                                   0, 100, self.data.kp,
                                   self.HandleSliderChange)
-        self.KiSlider = SliderBox(self.controlframe, 'Ki (Integral)',
+        self.KiSlider = SliderBox(pid_frame, 'Ki (Integral)',
                                   0, 50, self.data.ki,
                                   self.HandleSliderChange)
-        self.KdSlider = SliderBox(self.controlframe, 'Kd (Derivative)',
+        self.KdSlider = SliderBox(pid_frame, 'Kd (Derivative)',
                                   0, 20, self.data.kd,
                                   self.HandleSliderChange)
         self.sliders = [self.KpSlider, self.KiSlider, self.KdSlider]
@@ -120,10 +132,9 @@ class PIDTeachingAid(tk.Tk):
                       '1. Increase Kp for speed\n'
                       '2. Increase Kd to stop oscillation\n'
                       '3. Increase Ki to fix offset')
-        ttk.Label(self.controlframe, text=guide_text,
+        ttk.Label(pid_frame, text=guide_text,
                   foreground='#666').pack(anchor='w', pady=5)
-        ttk.Separator(self.controlframe, orient='horizontal')\
-           .pack(fill='x', pady=20)
+        self.nb.select(1)
 
         ########################################################################
         ###################### GUI objects : Animation Control #################
@@ -133,17 +144,17 @@ class PIDTeachingAid(tk.Tk):
                   font=('Arial', 12, 'bold')).pack(pady=5)
         self.btnframe = ttk.Frame(self.controlframe)
         self.btnframe.pack(fill='x', pady=5)
-        self.PlayButton   = ttk.Button(self.btnframe, text='Play', width=6,
-                                       command=self.PlayAnimation)
+        self.PlayButton   = tk.Button(self.btnframe, text='Play', width=6,
+                                      command=self.PlayAnimation)
         self.PlayButton   .pack(side='left', expand=True, fill='x', padx=1)
-        self.PauseButton  = ttk.Button(self.btnframe, text='Pause', width=6,
-                                       command=self.PauseAnimation)
+        self.PauseButton  = tk.Button(self.btnframe, text='Pause', width=6,
+                                      command=self.PauseAnimation)
         self.PauseButton  .pack(side='left', expand=True, fill='x', padx=1)
-        self.StopButton   = ttk.Button(self.btnframe, text='Stop', width=6,
-                                       command=self.StopAnimation)
+        self.StopButton   = tk.Button(self.btnframe, text='Stop', width=6,
+                                      command=self.StopAnimation)
         self.StopButton   .pack(side='left', expand=True, fill='x', padx=1)
-        self.ExportButton = ttk.Button(self.btnframe, text='Export', width=6,
-                                       command=self.ExportAnimation)
+        self.ExportButton = tk.Button(self.btnframe, text='Export', width=6,
+                                      command=self.ExportAnimation)
         self.ExportButton .pack(side='left', expand=True, fill='x', padx=1)
         ToolTip(self.PlayButton,   'Play the response animation')
         ToolTip(self.PauseButton,  'Pause the animation')

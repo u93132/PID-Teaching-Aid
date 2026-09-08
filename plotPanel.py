@@ -96,7 +96,7 @@ class PlotPanel:
                               color='#FF8500', fontsize=9)
         self.ax1.set_ylabel('Position (m)')
         self.ax1.set_ylim(-0.2, 2.0)
-        self.ax1.get_yaxis().set_label_coords(-0.05, 0.5)
+        self.ax1.get_yaxis().set_label_coords(-0.06, 0.5)
         self.ax1.set_xlim(0, t_end)
         self.ax1.grid(True, alpha=0.3)
 
@@ -112,7 +112,7 @@ class PlotPanel:
                                              lw=1.5, alpha=0.8)
         self.ax2.set_xlabel('Time (s)')
         self.ax2.set_ylabel('Control Force (N)')
-        self.ax2.get_yaxis().set_label_coords(-0.05, 0.5)
+        self.ax2.get_yaxis().set_label_coords(-0.06, 0.5)
         self.ax2.set_xlim(0, t_end)
         self.ax2.grid(True, alpha=0.3)
 

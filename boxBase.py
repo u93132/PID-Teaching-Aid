@@ -51,9 +51,8 @@ class SliderBox:
         self.frame.pack(fill='x', pady=5)
 
         step = (to - from_) * 0.01
-        self.MinusButton = ttk.Button(self.frame, text='-', width=2,
-                                      style='Small.TButton',
-                                      command=lambda: self.Step(-step))
+        self.MinusButton = tk.Button(self.frame, text='-', width=2,
+                                     command=lambda: self.Step(-step))
         self.MinusButton .grid(row=0, column=0, padx=2)
         self.Scale = ttk.Scale(self.frame, from_=from_, to=to,
                                orient='horizontal',
@@ -61,9 +60,8 @@ class SliderBox:
         self.Scale.set(initial)
         self.Scale .grid(row=0, column=1, sticky='ew', padx=2)
         self.frame.grid_columnconfigure(1, weight=1)
-        self.PlusButton = ttk.Button(self.frame, text='+', width=2,
-                                     style='Small.TButton',
-                                     command=lambda: self.Step(step))
+        self.PlusButton = tk.Button(self.frame, text='+', width=2,
+                                    command=lambda: self.Step(step))
         self.PlusButton .grid(row=0, column=2, padx=2)
 
     def get(self):
@@ -78,7 +76,7 @@ class SliderBox:
         self.Scale.set(min(hi, max(lo, self.get() + delta)))
 
     def SetState(self, enabled):
-        state = ['!disabled'] if enabled else ['disabled']
-        self.Scale.state(state)
-        self.MinusButton.state(state)
-        self.PlusButton.state(state)
+        s = 'normal' if enabled else 'disabled'
+        self.Scale.state(['!disabled'] if enabled else ['disabled'])
+        self.MinusButton.config(state=s)
+        self.PlusButton .config(state=s)
