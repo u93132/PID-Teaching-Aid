@@ -27,10 +27,6 @@ py -3 PIDTeachingAid_GUI.py
 - **Plant tab**: the mass-spring-damper values, m = 1, c = 0.5, k = 2.
 - **Play / Pause / Stop** run the response animation; **Export** saves it as
   a GIF with a parameter card.
-- **Ctrl+F2** toggles test mode: the charts overlay the continuous-time
-  closed-loop theory (dashed green), the Plant tab reveals m / c / k sliders
-  (m 0.1-5, c 0-5, k 0-10), and exports carry no watermark. Turning it off
-  restores m = 1, c = 0.5, k = 2.
 - Gains and the mode are saved to `%TEMP%\PIDTeachingAid.txt` and restored
   on the next launch.
 
