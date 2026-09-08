@@ -46,9 +46,9 @@ class SliderBox:
     # Scale's own callback, so there is a single notification path
     def __init__(self, parent, text, from_, to, initial, command):
         self.label = ttk.Label(parent, text=text)
-        self.label.pack(anchor='w', pady=(10, 0))
         self.frame = ttk.Frame(parent)
-        self.frame.pack(fill='x', pady=5)
+        self.visible = False
+        self.Show(True)
 
         step = (to - from_) * 0.01
         self.MinusButton = tk.Button(self.frame, text='-', width=2,
@@ -64,11 +64,32 @@ class SliderBox:
                                     command=lambda: self.Step(step))
         self.PlusButton .grid(row=0, column=2, padx=2)
 
+    def Show(self, visible):
+        # Hide or re-show the whole control. Re-showing appends to the
+        # parent's pack order, so toggle neighbouring boxes as a block
+        if visible == self.visible:
+            return
+        self.visible = visible
+        if visible:
+            self.label.pack(anchor='w', pady=(10, 0))
+            self.frame.pack(fill='x', pady=5)
+        else:
+            self.label.pack_forget()
+            self.frame.pack_forget()
+
     def get(self):
         return float(self.Scale.get())
 
     def set(self, value):
+        # A disabled ttk.Scale silently ignores set(). Programmatic
+        # updates must land regardless of the UI lock, so lift the
+        # lock just for the call (the +/- buttons stay as they were)
+        locked = 'disabled' in self.Scale.state()
+        if locked:
+            self.Scale.state(['!disabled'])
         self.Scale.set(value)
+        if locked:
+            self.Scale.state(['disabled'])
 
     def Step(self, delta):
         lo = float(self.Scale.cget('from'))

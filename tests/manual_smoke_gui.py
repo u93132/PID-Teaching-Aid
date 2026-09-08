@@ -60,6 +60,11 @@ def step2():
     check(app.test_mode == (not was), 'test mode did not toggle')
     if not app.test_mode:
         app.ToggleTestMode()   # make sure playback runs with overlay on
+    # Plant sliders appear only in test mode, unlocked at idle
+    check(all(s.frame.winfo_manager() == 'pack' for s in app.plant_sliders),
+          'plant sliders hidden in test mode')
+    check(all('disabled' not in s.Scale.state() for s in app.plant_sliders),
+          'plant sliders locked in test mode')
     app.PlayAnimation()
     app.after(400, step3)
 
@@ -69,6 +74,8 @@ def step3():
     check(app.current_step > 0, 'animation loop did not advance')
     check(str(app.PlayButton['state']) == 'disabled', 'play enabled while playing')
     check(str(app.PauseButton['state']) == 'normal', 'pause disabled while playing')
+    check(all('disabled' in s.Scale.state() for s in app.plant_sliders),
+          'plant sliders unlocked while playing')
     app.PauseAnimation()
     app.after(100, step4)
 
@@ -96,6 +103,10 @@ def step6():
     if app.test_mode:
         app.ToggleTestMode()
     check(not app.test_mode, 'test mode stuck on')
+    check((app.m, app.c, app.k) == (1.0, 0.5, 2.0),
+          'plant not reset on leaving test mode')
+    check(all(s.frame.winfo_manager() == '' for s in app.plant_sliders),
+          'plant sliders shown outside test mode')
     app.WriteSetting()
     reloaded = app.LoadSetting()
     check(abs(reloaded.kp - 40) < 1e-6, 'setting kp did not persist')

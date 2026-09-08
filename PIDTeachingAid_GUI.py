@@ -23,6 +23,11 @@ class Setting:
     ki: float = 0.0
     kd: float = 0.0
     watermark: int = 1
+    # Plant (mass-spring-damper). Adjustable in Ctrl+F2 test mode only;
+    # these defaults are the textbook plant students always see
+    m: float = 1.0
+    c: float = 0.5
+    k: float = 2.0
 
 
 # Define the application class
@@ -67,8 +72,8 @@ class PIDTeachingAid(tk.Tk):
                                             'foreground': 'SystemButtonText'}},
         })
         style.theme_use('MyStyle')
-        # Plant parameters
-        self.m, self.c, self.k = 1.0, 0.5, 2.0
+        # Plant parameters: read from the Plant sliders in UpdatePlot()
+        self.m = self.c = self.k = None
         # Simulation setup
         self.t_total = 16.0
         self.dt      = 0.02
@@ -77,6 +82,7 @@ class PIDTeachingAid(tk.Tk):
         self.anim_running = False
         self.is_paused    = False
         self.current_step = 0
+        self.anim_state   = 0   # last value passed to AnimState()
         self.res = None   # latest SimResult
         self.met = None   # latest Metrics
         self.sample_rate = 4   # export: one frame per 4 steps = 12.5 FPS
@@ -86,6 +92,11 @@ class PIDTeachingAid(tk.Tk):
         # Test mode (Ctrl+F2): theory overlay on the charts and no
         # watermark in exports. Stored inverted as the watermark flag
         self.test_mode = not bool(self.data.watermark)
+        if not self.test_mode:
+            # Outside test mode the plant is always the textbook one,
+            # whatever a hand-edited settings file says
+            d = Setting()
+            self.data.m, self.data.c, self.data.k = d.m, d.c, d.k
 
         ########################################################################
         ####################### GUI objects : Control Panel ####################
@@ -107,13 +118,22 @@ class PIDTeachingAid(tk.Tk):
         plant_frame.pack(fill='x', anchor='nw')
         pid_frame   = tk.Frame(self.nb.frame[1], padx=8, pady=5)
         pid_frame.pack(fill='x', anchor='nw')
-        # Plant tab: m / c / k static display
-        sys_text = (f'{"Mass (m):":<15}{self.m:.2f}\n'
-                    f'{"Damping (c):":<15}{self.c:.2f}\n'
-                    f'{"Stiffness (k):":<15}{self.k:.2f}')
-        self.SysLabel = ttk.Label(plant_frame, text=sys_text,
+        # Plant tab: m / c / k readout and sliders. The sliders are
+        # hidden outside Ctrl+F2 test mode (decided in AnimState). m has
+        # a floor because plant_accel divides by it
+        self.SysLabel = ttk.Label(plant_frame, text='',
                                   font=('Courier', 11))
         self.SysLabel.pack(pady=5)
+        self.MSlider = SliderBox(plant_frame, 'Mass (m)',
+                                 0.1, 5.0, self.data.m,
+                                 self.HandleSliderChange)
+        self.CSlider = SliderBox(plant_frame, 'Damping (c)',
+                                 0.0, 5.0, self.data.c,
+                                 self.HandleSliderChange)
+        self.KSlider = SliderBox(plant_frame, 'Stiffness (k)',
+                                 0.0, 10.0, self.data.k,
+                                 self.HandleSliderChange)
+        self.plant_sliders = [self.MSlider, self.CSlider, self.KSlider]
         # PID tab: gain readout, sliders, tuning guide
         self.InfoLabel = ttk.Label(pid_frame, text='',
                                    font=('Courier', 11))
@@ -195,6 +215,7 @@ class PIDTeachingAid(tk.Tk):
     def AnimState(self, i):
         # One function decides every button's enable/disable:
         # i = 0: idle, 1: playing, 2: paused, 3: exporting
+        self.anim_state = i
         match i:
             case 0:
                 self.PlayButton  .config(state='normal')
@@ -220,9 +241,13 @@ class PIDTeachingAid(tk.Tk):
                 self.ExportButton.config(state='disabled')
                 for s in self.sliders:
                     s.SetState(False)
+        # The plant sliders exist only in test mode and unlock only at idle
+        for s in self.plant_sliders:
+            s.Show(self.test_mode)
+            s.SetState(i == 0 and self.test_mode)
 
     def HandleSliderChange(self):
-        # Any gain change stops the playback and redraws the charts
+        # Any gain or plant change stops the playback and redraws
         if not self.is_ready:
             return
         self.StopAnimation()
@@ -232,6 +257,12 @@ class PIDTeachingAid(tk.Tk):
         kp = self.KpSlider.get()
         ki = self.KiSlider.get()
         kd = self.KdSlider.get()
+        self.m = self.MSlider.get()
+        self.c = self.CSlider.get()
+        self.k = self.KSlider.get()
+        self.SysLabel.config(text=(f'{"Mass (m):":<15}{self.m:.2f}\n'
+                                   f'{"Damping (c):":<15}{self.c:.2f}\n'
+                                   f'{"Stiffness (k):":<15}{self.k:.2f}'))
         self.InfoLabel.config(text=(f'Kp: {kp:6.2f}\n'
                                     f'Ki: {ki:6.2f}\n'
                                     f'Kd: {kd:6.2f}'))
@@ -299,7 +330,20 @@ class PIDTeachingAid(tk.Tk):
 
     def ToggleTestMode(self, event=None):
         self.test_mode = not self.test_mode
+        if not self.test_mode:
+            # Leaving test mode puts the textbook plant back. Set the
+            # sliders silently (is_ready gates their callback), then
+            # stop like any other plant change and redraw once below
+            d = Setting()
+            ready, self.is_ready = self.is_ready, False
+            self.MSlider.set(d.m)
+            self.CSlider.set(d.c)
+            self.KSlider.set(d.k)
+            self.is_ready = ready
+            self.StopAnimation()
         self.UpdatePlot()
+        # Re-apply the current state so the plant sliders follow test_mode
+        self.AnimState(self.anim_state)
 
     def ExportFrameHook(self, pos, curr_t, curr_u):
         # Called between exported frames: keep the chart cursor moving
@@ -337,6 +381,9 @@ class PIDTeachingAid(tk.Tk):
         self.data.kp = self.KpSlider.get()
         self.data.ki = self.KiSlider.get()
         self.data.kd = self.KdSlider.get()
+        self.data.m  = self.MSlider.get()
+        self.data.c  = self.CSlider.get()
+        self.data.k  = self.KSlider.get()
         self.data.watermark = int(not self.test_mode)
 
     def LoadSetting(self):
@@ -350,7 +397,7 @@ class PIDTeachingAid(tk.Tk):
                         continue
                     try:
                         match temp[0]:
-                            case 'kp' | 'ki' | 'kd':
+                            case 'kp' | 'ki' | 'kd' | 'm' | 'c' | 'k':
                                 setattr(data, temp[0], float(temp[1]))
                             case 'watermark':
                                 data.watermark = int(temp[1])
@@ -364,6 +411,9 @@ class PIDTeachingAid(tk.Tk):
             f.write(f'kp={self.data.kp}\n')
             f.write(f'ki={self.data.ki}\n')
             f.write(f'kd={self.data.kd}\n')
+            f.write(f'm={self.data.m}\n')
+            f.write(f'c={self.data.c}\n')
+            f.write(f'k={self.data.k}\n')
             f.write(f'watermark={self.data.watermark}\n')
 
 
