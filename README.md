@@ -65,4 +65,4 @@ py -3 -m PyInstaller PID.spec
 
 ## Updates
 
-- v2.0.0: Python 3.10 rewrite in modules, Plant / PID tabs, Ctrl+F2 test mode (theory overlay, plant sliders, watermark-free export), automated tests.
+- v2.0.0: Python 3.10 rewrite in modules, Plant / PID tabs.
